@@ -8,15 +8,21 @@ print("=== CLICKER GAME ===")
 name = input("Username: ")
 password = input("Password: ")
 
-r = requests.post(BASE + "/login", json={
-    "name": name,
-    "password": password
-})
+try:
+    r = requests.post(BASE + "/login", json={
+        "name": name,
+        "password": password
+    })
 
-token = r.json().get("token")
+    data = r.json()
+except:
+    print("Server error")
+    exit()
+
+token = data.get("token")
 
 if not token:
-    print("Login failed:", r.json())
+    print("Login failed:", data)
     exit()
 
 headers = {"Authorization": "Bearer " + token}
@@ -26,28 +32,26 @@ while True:
     print("\nclick | chat | readchat | top | exit")
     cmd = input("> ")
 
-    # CLICK
     if cmd == "click":
-        r = requests.post(BASE + "/click", headers=headers)
-        print(r.json())
+        print(requests.post(BASE + "/click", headers=headers).json())
 
-    # CHAT
     elif cmd == "chat":
         msg = input("Message: ")
-        r = requests.post(BASE + "/chat", json={"message": msg}, headers=headers)
-        print(r.json())
+        print(requests.post(
+            BASE + "/chat",
+            json={"message": msg},
+            headers=headers
+        ).json())
 
-    # READ CHAT
     elif cmd == "readchat":
         r = requests.get(BASE + "/chat")
-
         for row in reversed(r.json()):
-            print(f"{row[1]}: {row[2]}")
+            print(f"{row['name']}: {row['message']}")
 
-    # TOP
     elif cmd == "top":
         r = requests.get(BASE + "/top")
-        print(r.json())
+        for i, p in enumerate(r.json(), 1):
+            print(f"{i}. {p['name']} - {p['money']}")
 
     elif cmd == "exit":
         break

@@ -6,29 +6,19 @@ import time
 
 app = FastAPI()
 
-SECRET = "SUPER_SECRET_KEY_123"
+SECRET = os.getenv("SECRET", "DEV_SECRET_CHANGE_ME")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 last_click = {}
-last_chat = {}
-
-conn = None
-
 
 # ---------------- DB ----------------
 def get_conn():
     return psycopg2.connect(DATABASE_URL, sslmode="require")
 
 
-@app.on_event("startup")
-def startup():
-    global conn
+def db_cursor():
     conn = get_conn()
-    print("DB CONNECTED")
-
-
-def db():
-    return conn.cursor()
+    return conn, conn.cursor()
 
 
 # ---------------- JWT ----------------
@@ -49,18 +39,23 @@ def login(data: dict):
     name = data["name"]
     password = data["password"]
 
-    cur = db()
+    conn, cur = db_cursor()
+
     cur.execute("SELECT password FROM players WHERE name=%s", (name,))
     user = cur.fetchone()
 
     if not user:
+        cur.close()
+        conn.close()
         return {"error": "User not found"}
 
     if user[0] != password:
+        cur.close()
+        conn.close()
         return {"error": "Wrong password"}
 
-    conn.commit()
     cur.close()
+    conn.close()
 
     return {"token": create_token(name)}
 
@@ -79,10 +74,16 @@ def click(authorization: str = Header(None)):
 
     last_click[name] = now
 
-    cur = db()
-    cur.execute("UPDATE players SET money = money + 1 WHERE name=%s", (name,))
+    conn, cur = db_cursor()
+
+    cur.execute(
+        "UPDATE players SET money = money + 1 WHERE name=%s",
+        (name,)
+    )
+
     conn.commit()
     cur.close()
+    conn.close()
 
     return {"ok": True}
 
@@ -100,10 +101,16 @@ def chat(data: dict, authorization: str = Header(None)):
     if len(msg) > 200:
         return {"error": "Too long"}
 
-    cur = db()
-    cur.execute("INSERT INTO chat (name, message) VALUES (%s, %s)", (name, msg))
+    conn, cur = db_cursor()
+
+    cur.execute(
+        "INSERT INTO chat (name, message) VALUES (%s, %s)",
+        (name, msg)
+    )
+
     conn.commit()
     cur.close()
+    conn.close()
 
     return {"ok": True}
 
@@ -111,18 +118,38 @@ def chat(data: dict, authorization: str = Header(None)):
 # ---------------- CHAT GET ----------------
 @app.get("/chat")
 def get_chat():
-    cur = db()
-    cur.execute("SELECT id, name, message FROM chat ORDER BY id DESC LIMIT 20")
-    data = cur.fetchall()
+    conn, cur = db_cursor()
+
+    cur.execute(
+        "SELECT id, name, message FROM chat ORDER BY id DESC LIMIT 20"
+    )
+
+    rows = cur.fetchall()
+
     cur.close()
-    return data
+    conn.close()
+
+    return [
+        {"id": r[0], "name": r[1], "message": r[2]}
+        for r in rows
+    ]
 
 
 # ---------------- TOP ----------------
 @app.get("/top")
 def top():
-    cur = db()
-    cur.execute("SELECT name, money FROM players ORDER BY money DESC LIMIT 5")
-    data = cur.fetchall()
+    conn, cur = db_cursor()
+
+    cur.execute(
+        "SELECT name, money FROM players ORDER BY money DESC LIMIT 5"
+    )
+
+    rows = cur.fetchall()
+
     cur.close()
-    return data
+    conn.close()
+
+    return [
+        {"name": r[0], "money": r[1]}
+        for r in rows
+    ]

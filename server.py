@@ -60,6 +60,8 @@ def login(data: dict):
 
     return {"token": create_token(name)}
 
+
+# ---------------- REGISTER ----------------
 @app.post("/register")
 def register(data: dict):
     name = data["name"]
@@ -67,16 +69,14 @@ def register(data: dict):
 
     conn, cur = db_cursor()
 
-    # проверяем есть ли пользователь
     cur.execute("SELECT name FROM players WHERE name=%s", (name,))
     if cur.fetchone():
         cur.close()
         conn.close()
         return {"error": "User already exists"}
 
-    # создаём нового игрока
     cur.execute(
-        "INSERT INTO players (name, password, money) VALUES (%s, %s, 0)",
+        "INSERT INTO players (name, password) VALUES (%s, %s)",
         (name, password)
     )
 
@@ -86,13 +86,16 @@ def register(data: dict):
 
     return {"ok": True}
 
+
 # ---------------- CLICK ----------------
 @app.post("/click")
 def click(authorization: str = Header(None)):
     name = verify(authorization.replace("Bearer ", ""))
-    online[name] = time.time()
+
     if not name:
         return {"error": "Invalid token"}
+
+    online[name] = time.time()
 
     now = time.time()
     if name in last_click and now - last_click[name] < 0.3:
@@ -103,8 +106,8 @@ def click(authorization: str = Header(None)):
     conn, cur = db_cursor()
 
     cur.execute(
-    "UPDATE players SET money = money + multiplier WHERE name=%s",
-    (name,)
+        "UPDATE players SET money = money + multiplier WHERE name=%s",
+        (name,)
     )
 
     cur.execute(
@@ -119,6 +122,47 @@ def click(authorization: str = Header(None)):
     conn.close()
 
     return {"ok": True, "money": money}
+
+
+# ---------------- BUY ----------------
+@app.post("/buy")
+def buy(authorization: str = Header(None)):
+    name = verify(authorization.replace("Bearer ", ""))
+
+    if not name:
+        return {"error": "Invalid token"}
+
+    conn, cur = db_cursor()
+
+    cur.execute("SELECT money, multiplier FROM players WHERE name=%s", (name,))
+    row = cur.fetchone()
+
+    if not row:
+        cur.close()
+        conn.close()
+        return {"error": "User not found"}
+
+    money, mult = row
+    cost = mult * 10
+
+    if money < cost:
+        cur.close()
+        conn.close()
+        return {"error": f"Need {cost}"}
+
+    new_money = money - cost
+    new_mult = mult + 1
+
+    cur.execute(
+        "UPDATE players SET money=%s, multiplier=%s WHERE name=%s",
+        (new_money, new_mult, name)
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"ok": True, "multiplier": new_mult, "money": new_money}
 
 
 # ---------------- CHAT ----------------
@@ -187,46 +231,18 @@ def top():
         for r in rows
     ]
 
-@app.post("/buy")
-def buy(authorization: str = Header(None)):
-    name = verify(authorization.replace("Bearer ", ""))
 
-    if not name:
-        return {"error": "Invalid token"}
-
-    conn, cur = db_cursor()
-
-    cur.execute("SELECT money, multiplier FROM players WHERE name=%s", (name,))
-    row = cur.fetchone()
-
-    if not row:
-        return {"error": "User not found"}
-
-    money, mult = row
-
-    cost = mult * 10
-
-    if money < cost:
-        return {"error": f"Need {cost}"}
-
-    new_money = money - cost
-    new_mult = mult + 1
-
-    cur.execute(
-        "UPDATE players SET money=%s, multiplier=%s WHERE name=%s",
-        (new_money, new_mult, name)
-    )
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    return {"ok": True, "multiplier": new_mult, "money": new_money}
-
+# ---------------- ONLINE ----------------
 @app.get("/online")
 def get_online():
     now = time.time()
-    return [
+
+    players = [
         name for name, t in online.items()
         if now - t < 10
     ]
+
+    return {
+        "count": len(players),
+        "players": players
+    }

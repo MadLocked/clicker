@@ -4,72 +4,49 @@ BASE = "https://clickergame-41c3.onrender.com"
 
 print("=== CLICKER GAME ===")
 
-# ---------------- MODE ----------------
-mode = input("Type 'login' or 'register': ").strip().lower()
+mode = input("login or register: ").strip()
 
 name = input("Username: ")
 password = input("Password: ")
 
 # ---------------- REGISTER ----------------
 if mode == "register":
-    try:
-        r = requests.post(BASE + "/register", json={
-            "name": name,
-            "password": password
-        })
-        data = r.json()
-    except:
-        print("Server error")
-        exit()
-
-    if data.get("error"):
-        print("Register failed:", data["error"])
-        exit()
-
-    print("Registered successfully! Now login again.")
-    exit()
-
-
-# ---------------- LOGIN ----------------
-try:
-    r = requests.post(BASE + "/login", json={
+    r = requests.post(BASE + "/register", json={
         "name": name,
         "password": password
     })
-
-    data = r.json()
-except:
-    print("Server error")
+    print(r.json())
     exit()
 
-token = data.get("token")
+# ---------------- LOGIN ----------------
+r = requests.post(BASE + "/login", json={
+    "name": name,
+    "password": password
+})
 
-if not token:
+data = r.json()
+
+if not data.get("token"):
     print("Login failed:", data)
     exit()
 
-headers = {"Authorization": "Bearer " + token}
-
+headers = {"Authorization": "Bearer " + data["token"]}
 
 # ---------------- LOOP ----------------
 while True:
     print("\n[ENTER]=click | chat | readchat | top | buy | online | exit")
     cmd = input("> ").strip()
 
-    # ---------------- ENTER = CLICK ----------------
+    # CLICK
     if cmd == "":
         r = requests.post(BASE + "/click", headers=headers)
         data = r.json()
 
-        # если клик не прошёл
         if "error" in data:
             print("❌", data["error"])
-            continue
         else:
-            print("💰", data["money"])
-        continue
+            print(f"+💰 → {data['money']}")
 
-    # ---------------- COMMANDS ----------------
     elif cmd == "chat":
         msg = input("Message: ")
         print(requests.post(
@@ -89,12 +66,11 @@ while True:
             print(f"{i}. {p['name']} - {p['money']}")
 
     elif cmd == "buy":
-        r = requests.post(BASE + "/buy", headers=headers)
-        print(r.json())
+        print(requests.post(BASE + "/buy", headers=headers).json())
 
     elif cmd == "online":
-        r = requests.get(BASE + "/online")
-        print("Online:", r.json())
+        data = requests.get(BASE + "/online").json()
+        print(f"🟢 Online ({data['count']}):", data["players"])
 
     elif cmd == "exit":
         break

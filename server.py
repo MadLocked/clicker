@@ -10,6 +10,7 @@ SECRET = os.getenv("SECRET", "DEV_SECRET_CHANGE_ME")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 last_click = {}
+online = {}
 
 # ---------------- DB ----------------
 def get_conn():
@@ -89,7 +90,7 @@ def register(data: dict):
 @app.post("/click")
 def click(authorization: str = Header(None)):
     name = verify(authorization.replace("Bearer ", ""))
-
+    online[name] = time.time()
     if not name:
         return {"error": "Invalid token"}
 
@@ -102,7 +103,7 @@ def click(authorization: str = Header(None)):
     conn, cur = db_cursor()
 
     cur.execute(
-    "UPDATE players SET money = money + 1 WHERE name=%s",
+    "UPDATE players SET money = money + multiplier WHERE name=%s",
     (name,)
     )
 
@@ -184,4 +185,48 @@ def top():
     return [
         {"name": r[0], "money": r[1]}
         for r in rows
+    ]
+
+@app.post("/buy")
+def buy(authorization: str = Header(None)):
+    name = verify(authorization.replace("Bearer ", ""))
+
+    if not name:
+        return {"error": "Invalid token"}
+
+    conn, cur = db_cursor()
+
+    cur.execute("SELECT money, multiplier FROM players WHERE name=%s", (name,))
+    row = cur.fetchone()
+
+    if not row:
+        return {"error": "User not found"}
+
+    money, mult = row
+
+    cost = mult * 10
+
+    if money < cost:
+        return {"error": f"Need {cost}"}
+
+    new_money = money - cost
+    new_mult = mult + 1
+
+    cur.execute(
+        "UPDATE players SET money=%s, multiplier=%s WHERE name=%s",
+        (new_money, new_mult, name)
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"ok": True, "multiplier": new_mult, "money": new_money}
+
+@app.get("/online")
+def get_online():
+    now = time.time()
+    return [
+        name for name, t in online.items()
+        if now - t < 10
     ]

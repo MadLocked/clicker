@@ -53,6 +53,7 @@ headers = {"Authorization": "Bearer " + token}
 
 # ---------------- LOOP ----------------
 while True:
+    print("\n[ENTER]=click | chat | readchat | top | buy | online | exit")
     cmd = input("> ").strip()
 
     # ---------------- ENTER = CLICK ----------------
@@ -86,6 +87,14 @@ while True:
         r = requests.get(BASE + "/top")
         for i, p in enumerate(r.json(), 1):
             print(f"{i}. {p['name']} - {p['money']}")
+
+    elif cmd == "buy":
+        r = requests.post(BASE + "/buy", headers=headers)
+        print(r.json())
+
+    elif cmd == "online":
+        r = requests.get(BASE + "/online")
+        print("Online:", r.json())
 
     elif cmd == "exit":
         break

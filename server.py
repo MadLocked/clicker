@@ -143,7 +143,7 @@ def buy(authorization: str = Header(None)):
         return {"error": "User not found"}
 
     money, mult = row
-    cost = mult * 10
+    cost = (mult ** 2) * 2
 
     if money < cost:
         cur.close()

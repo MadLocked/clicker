@@ -17,18 +17,18 @@ conn = None
 
 # ---------------- DB ----------------
 def get_conn():
-    return psycopg2.connect(DATABASE_URL)
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
 
 
 @app.on_event("startup")
 def startup():
     global conn
-    try:
-        conn = get_conn()
-        print("DB CONNECTED")
-    except Exception as e:
-        print("DB ERROR:", e)
-        conn = None
+    conn = get_conn()
+    print("DB CONNECTED")
+
+
+def db():
+    return conn.cursor()
 
 
 # ---------------- JWT ----------------
@@ -43,52 +43,24 @@ def verify(token):
         return None
 
 
-# ---------------- DB HELPER ----------------
-def db_exec(query, params=None, fetch=False):
-    if not conn:
-        return None
-
-    try:
-        cur = conn.cursor()
-        cur.execute(query, params or ())
-
-        if fetch:
-            data = cur.fetchall()
-            cur.close()
-            return data
-
-        conn.commit()
-        cur.close()
-        return True
-
-    except Exception as e:
-        print("DB ERROR:", e)
-        return None
-
-
-# ---------------- LOGS ----------------
-def add_log(name, action):
-    db_exec(
-        "INSERT INTO logs (name, action) VALUES (%s, %s)",
-        (name, action)
-    )
-
-
 # ---------------- LOGIN ----------------
 @app.post("/login")
 def login(data: dict):
     name = data["name"]
+    password = data["password"]
 
-    user = db_exec(
-        "SELECT password FROM players WHERE name=%s",
-        (name,),
-        fetch=True
-    )
+    cur = db()
+    cur.execute("SELECT password FROM players WHERE name=%s", (name,))
+    user = cur.fetchone()
 
     if not user:
         return {"error": "User not found"}
 
-    add_log(name, "login")
+    if user[0] != password:
+        return {"error": "Wrong password"}
+
+    conn.commit()
+    cur.close()
 
     return {"token": create_token(name)}
 
@@ -107,12 +79,10 @@ def click(authorization: str = Header(None)):
 
     last_click[name] = now
 
-    db_exec(
-        "UPDATE players SET money = money + 1 WHERE name=%s",
-        (name,)
-    )
-
-    add_log(name, "click")
+    cur = db()
+    cur.execute("UPDATE players SET money = money + 1 WHERE name=%s", (name,))
+    conn.commit()
+    cur.close()
 
     return {"ok": True}
 
@@ -130,39 +100,29 @@ def chat(data: dict, authorization: str = Header(None)):
     if len(msg) > 200:
         return {"error": "Too long"}
 
-    now = time.time()
-    if name in last_chat and now - last_chat[name] < 1:
-        return {"error": "Spam"}
-
-    last_chat[name] = now
-
-    db_exec(
-        "INSERT INTO chat (name, message) VALUES (%s, %s)",
-        (name, msg)
-    )
-
-    add_log(name, "chat")
+    cur = db()
+    cur.execute("INSERT INTO chat (name, message) VALUES (%s, %s)", (name, msg))
+    conn.commit()
+    cur.close()
 
     return {"ok": True}
 
 
-# ---------------- GET CHAT ----------------
+# ---------------- CHAT GET ----------------
 @app.get("/chat")
 def get_chat():
-    return db_exec("""
-        SELECT id, name, message, created_at
-        FROM chat
-        ORDER BY id DESC
-        LIMIT 20
-    """, fetch=True)
+    cur = db()
+    cur.execute("SELECT id, name, message FROM chat ORDER BY id DESC LIMIT 20")
+    data = cur.fetchall()
+    cur.close()
+    return data
 
 
 # ---------------- TOP ----------------
 @app.get("/top")
 def top():
-    return db_exec("""
-        SELECT name, money
-        FROM players
-        ORDER BY money DESC
-        LIMIT 5
-    """, fetch=True)
+    cur = db()
+    cur.execute("SELECT name, money FROM players ORDER BY money DESC LIMIT 5")
+    data = cur.fetchall()
+    cur.close()
+    return data

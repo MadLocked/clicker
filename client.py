@@ -2,6 +2,8 @@ import requests
 
 BASE = "https://clickergame-41c3.onrender.com"
 
+print("=== CLICKER GAME ===")
+
 # ---------------- LOGIN ----------------
 name = input("Username: ")
 password = input("Password: ")
@@ -14,14 +16,14 @@ r = requests.post(BASE + "/login", json={
 token = r.json().get("token")
 
 if not token:
-    print("Login failed")
+    print("Login failed:", r.json())
     exit()
 
 headers = {"Authorization": "Bearer " + token}
 
-# ---------------- GAME LOOP ----------------
+# ---------------- LOOP ----------------
 while True:
-    print("\nclick | send | chat | readchat | top | exit")
+    print("\nclick | chat | readchat | top | exit")
     cmd = input("> ")
 
     # CLICK
@@ -29,42 +31,24 @@ while True:
         r = requests.post(BASE + "/click", headers=headers)
         print(r.json())
 
-    # SEND MONEY
-    elif cmd == "send":
-        to = input("To: ")
-        amount = int(input("Amount: "))
-
-        r = requests.post(BASE + "/send", json={
-            "to": to,
-            "amount": amount
-        }, headers=headers)
-
-        print(r.json())
-
-    # CHAT SEND
+    # CHAT
     elif cmd == "chat":
         msg = input("Message: ")
-
-        r = requests.post(BASE + "/chat", json={
-            "message": msg
-        }, headers=headers)
-
+        r = requests.post(BASE + "/chat", json={"message": msg}, headers=headers)
         print(r.json())
 
-    # CHAT READ
+    # READ CHAT
     elif cmd == "readchat":
         r = requests.get(BASE + "/chat")
 
         for row in reversed(r.json()):
-            id, n, msg, t = row
-            print(f"[{t}] {n}: {msg}")
+            print(f"{row[1]}: {row[2]}")
 
     # TOP
     elif cmd == "top":
         r = requests.get(BASE + "/top")
         print(r.json())
 
-    # EXIT
     elif cmd == "exit":
         break
 

@@ -53,12 +53,22 @@ headers = {"Authorization": "Bearer " + token}
 
 # ---------------- LOOP ----------------
 while True:
-    print("\nclick | chat | readchat | top | exit")
-    cmd = input("> ")
+    cmd = input("> ").strip()
 
-    if cmd == "click":
-        print(requests.post(BASE + "/click", headers=headers).json())
+    # ---------------- ENTER = CLICK ----------------
+    if cmd == "":
+        r = requests.post(BASE + "/click", headers=headers)
+        data = r.json()
 
+        # если клик не прошёл
+        if "error" in data:
+            print("❌", data["error"])
+            continue
+        else:
+            print("💰", data["money"])
+        continue
+
+    # ---------------- COMMANDS ----------------
     elif cmd == "chat":
         msg = input("Message: ")
         print(requests.post(

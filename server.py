@@ -102,15 +102,22 @@ def click(authorization: str = Header(None)):
     conn, cur = db_cursor()
 
     cur.execute(
-        "UPDATE players SET money = money + 1 WHERE name=%s",
+    "UPDATE players SET money = money + 1 WHERE name=%s",
+    (name,)
+    )
+
+    cur.execute(
+        "SELECT money FROM players WHERE name=%s",
         (name,)
     )
+
+    money = cur.fetchone()[0]
 
     conn.commit()
     cur.close()
     conn.close()
 
-    return {"ok": True}
+    return {"ok": True, "money": money}
 
 
 # ---------------- CHAT ----------------

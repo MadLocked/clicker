@@ -4,10 +4,33 @@ BASE = "https://clickergame-41c3.onrender.com"
 
 print("=== CLICKER GAME ===")
 
-# ---------------- LOGIN ----------------
+# ---------------- MODE ----------------
+mode = input("Type 'login' or 'register': ").strip().lower()
+
 name = input("Username: ")
 password = input("Password: ")
 
+# ---------------- REGISTER ----------------
+if mode == "register":
+    try:
+        r = requests.post(BASE + "/register", json={
+            "name": name,
+            "password": password
+        })
+        data = r.json()
+    except:
+        print("Server error")
+        exit()
+
+    if data.get("error"):
+        print("Register failed:", data["error"])
+        exit()
+
+    print("Registered successfully! Now login again.")
+    exit()
+
+
+# ---------------- LOGIN ----------------
 try:
     r = requests.post(BASE + "/login", json={
         "name": name,
@@ -26,6 +49,7 @@ if not token:
     exit()
 
 headers = {"Authorization": "Bearer " + token}
+
 
 # ---------------- LOOP ----------------
 while True:

@@ -59,6 +59,31 @@ def login(data: dict):
 
     return {"token": create_token(name)}
 
+@app.post("/register")
+def register(data: dict):
+    name = data["name"]
+    password = data["password"]
+
+    conn, cur = db_cursor()
+
+    # проверяем есть ли пользователь
+    cur.execute("SELECT name FROM players WHERE name=%s", (name,))
+    if cur.fetchone():
+        cur.close()
+        conn.close()
+        return {"error": "User already exists"}
+
+    # создаём нового игрока
+    cur.execute(
+        "INSERT INTO players (name, password, money) VALUES (%s, %s, 0)",
+        (name, password)
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"ok": True}
 
 # ---------------- CLICK ----------------
 @app.post("/click")
